@@ -1,22 +1,33 @@
 import streamlit as st
 import numpy as np
 from PIL import Image
-from tensorflow.keras.models import load_model
-from tensorflow.keras.applications.efficientnet import preprocess_input
+from tensorflow.keras.applications import EfficientNetB0
+from tensorflow.keras.layers import GlobalAveragePooling2D, Dropout, Dense
+from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.image import img_to_array
-import os
+from tensorflow.keras.applications.efficientnet import preprocess_input
 
 # Constants
 IMG_SIZE = (224, 224)
 MODEL_PATH = "tree_species_model.h5"
 
-# Load Model
+# Load model from architecture and weights
 @st.cache_resource
 def load_efficientnet_model():
-    model = load_model(MODEL_PATH)
+    base_model = EfficientNetB0(include_top=False, input_shape=(224, 224, 3), weights='imagenet')
+    base_model.trainable = False
+
+    model = Sequential([
+        base_model,
+        GlobalAveragePooling2D(),
+        Dropout(0.3),
+        Dense(128, activation='relu'),
+        Dropout(0.3),
+        Dense(30, activation='softmax')  # Make sure this matches your num_classes
+    ])
+    model.load_weights(MODEL_PATH)
     return model
 
-# Predict function
 def predict_species(image, model, class_labels):
     img = image.resize(IMG_SIZE)
     img_array = img_to_array(img)
@@ -28,7 +39,6 @@ def predict_species(image, model, class_labels):
     top_3 = [(class_labels[i], predictions[i]) for i in top_3_indices]
     return top_3
 
-# Main App
 def main():
     st.title("🌳 Tree Species Classifier")
     model = load_efficientnet_model()
@@ -36,7 +46,6 @@ def main():
     st.write("Upload a tree image to classify its species.")
     uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
 
-    # Dummy labels (Update these from your dataset)
     class_labels = sorted([
         "Acacia", "Aloe", "Ashoka", "Bamboo", "Banyan", "Bael", "Bottlebrush",
         "Coconut", "Drumstick", "Eucalyptus", "Ficus", "Flame", "Gulmohar",
