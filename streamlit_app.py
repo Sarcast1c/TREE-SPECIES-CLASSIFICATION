@@ -1,59 +1,62 @@
 import streamlit as st
 import numpy as np
 from PIL import Image
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from tensorflow.keras.models import load_model
+from tensorflow.keras.applications.efficientnet import preprocess_input
 from tensorflow.keras.preprocessing.image import img_to_array
+import os
 
-IMG_HEIGHT = 224
-IMG_WIDTH = 224
-NUM_CLASSES = 30  # Update if you know your actual number of tree classes
+# Constants
+IMG_SIZE = (224, 224)
+MODEL_PATH = "tree_species_model.h5"
 
-# Dummy class labels
-class_labels = [f"Class {i+1}" for i in range(NUM_CLASSES)]
-
+# Load Model
 @st.cache_resource
-def build_model():
-    model = Sequential([
-        Conv2D(32, (3, 3), activation='relu', input_shape=(IMG_HEIGHT, IMG_WIDTH, 3)),
-        MaxPooling2D(2, 2),
-        Conv2D(64, (3, 3), activation='relu'),
-        MaxPooling2D(2, 2),
-        Flatten(),
-        Dense(128, activation='relu'),
-        Dropout(0.5),
-        Dense(NUM_CLASSES, activation='softmax')
-    ])
-    model.load_weights("tree_species_model.h5")
+def load_efficientnet_model():
+    model = load_model(MODEL_PATH)
     return model
 
-model = build_model()
-
-def preprocess(img):
-    img = img.resize((IMG_WIDTH, IMG_HEIGHT))
-    img_array = img_to_array(img) / 255.0
+# Predict function
+def predict_species(image, model, class_labels):
+    img = image.resize(IMG_SIZE)
+    img_array = img_to_array(img)
+    img_array = preprocess_input(img_array)
     img_array = np.expand_dims(img_array, axis=0)
-    return img_array
 
-st.title("🌳 Tree Species Classifier")
-st.write("Upload a tree image to predict its species.")
+    predictions = model.predict(img_array)[0]
+    top_3_indices = predictions.argsort()[-3:][::-1]
+    top_3 = [(class_labels[i], predictions[i]) for i in top_3_indices]
+    return top_3
 
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+# Main App
+def main():
+    st.title("🌳 Tree Species Classifier")
+    model = load_efficientnet_model()
 
-if uploaded_file:
-    try:
-        img = Image.open(uploaded_file).convert("RGB")
-        st.image(img, caption="Uploaded Image", use_column_width=True)
+    st.write("Upload a tree image to classify its species.")
+    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
 
-        input_array = preprocess(img)
-        predictions = model.predict(input_array)[0]
+    # Dummy labels (Update these from your dataset)
+    class_labels = sorted([
+        "Acacia", "Aloe", "Ashoka", "Bamboo", "Banyan", "Bael", "Bottlebrush",
+        "Coconut", "Drumstick", "Eucalyptus", "Ficus", "Flame", "Gulmohar",
+        "Guava", "IndianTulip", "Jamun", "Jasmine", "Lemon", "Mahogany",
+        "Mango", "Neem", "Peepal", "Pine", "Pomegranate", "RainTree",
+        "Rosewood", "Seesam", "Siris", "Tamarind", "Teak"
+    ])
 
-        top_3 = predictions.argsort()[-3:][::-1]
-        st.subheader("🔝 Top 3 Predictions:")
-        for idx in top_3:
-            st.write(f"{class_labels[idx]} — {predictions[idx]:.2%}")
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file).convert("RGB")
+        st.image(image, caption="Uploaded Image", use_column_width=True)
 
-        st.success(f"🌲 Most Likely Species: **{class_labels[top_3[0]]}**")
-    except Exception as e:
-        st.error("❌ Error processing image.")
-        st.exception(e)
+        st.subheader("🔍 Classification Result")
+        with st.spinner("Predicting..."):
+            top_3 = predict_species(image, model, class_labels)
+            top_1 = top_3[0]
+            st.success(f"**Top Prediction:** {top_1[0]} ({top_1[1]*100:.2f}% confidence)")
+            st.write("Top 3 Predictions:")
+            for label, prob in top_3:
+                st.write(f"- {label}: {prob:.2%}")
+
+if __name__ == "__main__":
+    main()
