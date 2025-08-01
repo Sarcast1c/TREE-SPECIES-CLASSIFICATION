@@ -10,18 +10,12 @@ import os
 # and is in the same directory as your Streamlit app, or provide the correct path.
 MODEL_PATH = 'improved_cnn_model.h5' # Change this if you used the basic CNN model
 
-# Assuming your dataset structure allows extracting class names from directory names.
-# If not, you might need to hardcode the class names list here in the correct order
-# as per your model's output.
-# Example: CLASS_NAMES = ['amla', 'asopalav', ...]
-
-# You might need to adjust the path to your dataset depending on where you run the Streamlit app.
-# If the dataset is not needed for prediction (only the model and class names),
-# you can remove the dataset loading part and hardcode CLASS_NAMES.
-REPO_PATH = os.path.join("TREE-SPECIES-CLASSIFICATION", "Tree_Species_Dataset")
+# Hardcoded list of class names based on your dataset and training.
+# Ensure this list is in the same order as the model's output classes.
+CLASS_NAMES = ['amla', 'asopalav', 'babul', 'bamboo', 'banyan', 'bili', 'cactus', 'champa', 'coconut', 'garmalo', 'gulmohor', 'gunda', 'jamun', 'kanchan', 'kesudo', 'khajur', 'mango', 'motichanoti', 'neem', 'nilgiri', 'other', 'pilikaren', 'pipal', 'saptaparni', 'shirish', 'simlo', 'sitafal', 'sonmahor', 'sugarcane', 'vad']
 
 
-# --- Load Model and Class Names ---
+# --- Load Model ---
 @st.cache_resource # Cache the model loading for better performance
 def load_my_model(model_path):
     try:
@@ -31,24 +25,10 @@ def load_my_model(model_path):
         st.error(f"Error loading model: {e}")
         return None
 
-@st.cache_resource # Cache class names loading
-def get_class_names(repo_path):
-    try:
-        # This assumes the directory names in REPO_PATH are your class names
-        class_names = sorted(os.listdir(repo_path))
-        return class_names
-    except Exception as e:
-        st.error(f"Error getting class names from {repo_path}: {e}")
-        # Fallback if directory listing fails - hardcode class names if known
-        # return ['amla', 'asopalav', ...] # Example hardcoded list
-        return None
-
-
 model = load_my_model(MODEL_PATH)
-class_names = get_class_names(REPO_PATH)
 
-if model is None or class_names is None:
-    st.stop() # Stop the app if model or class names couldn't be loaded
+if model is None:
+    st.stop() # Stop the app if model couldn't be loaded
 
 
 # --- Prediction Function ---
@@ -80,14 +60,14 @@ if uploaded_file is not None:
     st.image(img, caption="Uploaded Image", use_column_width=True)
 
     # Make prediction
-    if model is not None and class_names is not None:
+    if model is not None and CLASS_NAMES is not None:
         with st.spinner("Predicting..."):
-            predicted_species, confidence = predict_image(img, model, class_names)
+            predicted_species, confidence = predict_image(img, model, CLASS_NAMES)
 
         st.write(f"**Predicted Species:** {predicted_species}")
         st.write(f"**Confidence:** {confidence:.2f}")
     else:
-        st.error("Model or class names not loaded. Cannot make prediction.")
+        st.error("Model or class names not available. Cannot make prediction.")
 
 # --- Instructions for Running ---
 st.sidebar.header("How to run this app")
