@@ -7,7 +7,9 @@ Original file is located at
     https://colab.research.google.com/drive/1ToP0DpzPQy8nSNVa_lWN_ea6LM8SnocO
 """
 
-!git clone https://github.com/Sarcast1c/TREE-SPECIES-CLASSIFICATION.git
+import subprocess
+subprocess.run(["git", "clone", "https://github.com/Sarcast1c/TREE-SPECIES-CLASSIFICATION.git"])
+
 
 import os
 
