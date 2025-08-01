@@ -1,71 +1,101 @@
 import streamlit as st
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing import image
 import numpy as np
-from PIL import Image
-from tensorflow.keras.applications import EfficientNetB0
-from tensorflow.keras.layers import GlobalAveragePooling2D, Dropout, Dense
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.preprocessing.image import img_to_array
-from tensorflow.keras.applications.efficientnet import preprocess_input
+import os
 
-# Constants
-IMG_SIZE = (224, 224)
-MODEL_PATH = "tree_species_model.h5"
+# --- Configuration ---
+# Assuming your model file is named 'improved_cnn_model.h5' or 'basic_cnn_tree_species.h5'
+# and is in the same directory as your Streamlit app, or provide the correct path.
+MODEL_PATH = 'improved_cnn_model.h5' # Change this if you used the basic CNN model
 
-# Load model from architecture and weights
-@st.cache_resource
-def load_efficientnet_model():
-    base_model = EfficientNetB0(include_top=False, input_shape=(224, 224, 3), weights='imagenet')
-    base_model.trainable = False
+# Assuming your dataset structure allows extracting class names from directory names.
+# If not, you might need to hardcode the class names list here in the correct order
+# as per your model's output.
+# Example: CLASS_NAMES = ['amla', 'asopalav', ...]
 
-    model = Sequential([
-        base_model,
-        GlobalAveragePooling2D(),
-        Dropout(0.3),
-        Dense(128, activation='relu'),
-        Dropout(0.3),
-        Dense(30, activation='softmax')  # Make sure this matches your num_classes
-    ])
-    model.load_weights(MODEL_PATH)
-    return model
+# You might need to adjust the path to your dataset depending on where you run the Streamlit app.
+# If the dataset is not needed for prediction (only the model and class names),
+# you can remove the dataset loading part and hardcode CLASS_NAMES.
+REPO_PATH = os.path.join("TREE-SPECIES-CLASSIFICATION", "Tree_Species_Dataset")
 
-def predict_species(image, model, class_labels):
-    img = image.resize(IMG_SIZE)
-    img_array = img_to_array(img)
-    img_array = preprocess_input(img_array)
-    img_array = np.expand_dims(img_array, axis=0)
 
-    predictions = model.predict(img_array)[0]
-    top_3_indices = predictions.argsort()[-3:][::-1]
-    top_3 = [(class_labels[i], predictions[i]) for i in top_3_indices]
-    return top_3
+# --- Load Model and Class Names ---
+@st.cache_resource # Cache the model loading for better performance
+def load_my_model(model_path):
+    try:
+        model = load_model(model_path)
+        return model
+    except Exception as e:
+        st.error(f"Error loading model: {e}")
+        return None
 
-def main():
-    st.title("🌳 Tree Species Classifier")
-    model = load_efficientnet_model()
+@st.cache_resource # Cache class names loading
+def get_class_names(repo_path):
+    try:
+        # This assumes the directory names in REPO_PATH are your class names
+        class_names = sorted(os.listdir(repo_path))
+        return class_names
+    except Exception as e:
+        st.error(f"Error getting class names from {repo_path}: {e}")
+        # Fallback if directory listing fails - hardcode class names if known
+        # return ['amla', 'asopalav', ...] # Example hardcoded list
+        return None
 
-    st.write("Upload a tree image to classify its species.")
-    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
 
-    class_labels = sorted([
-        "Acacia", "Aloe", "Ashoka", "Bamboo", "Banyan", "Bael", "Bottlebrush",
-        "Coconut", "Drumstick", "Eucalyptus", "Ficus", "Flame", "Gulmohar",
-        "Guava", "IndianTulip", "Jamun", "Jasmine", "Lemon", "Mahogany",
-        "Mango", "Neem", "Peepal", "Pine", "Pomegranate", "RainTree",
-        "Rosewood", "Seesam", "Siris", "Tamarind", "Teak"
-    ])
+model = load_my_model(MODEL_PATH)
+class_names = get_class_names(REPO_PATH)
 
-    if uploaded_file is not None:
-        image = Image.open(uploaded_file).convert("RGB")
-        st.image(image, caption="Uploaded Image", use_column_width=True)
+if model is None or class_names is None:
+    st.stop() # Stop the app if model or class names couldn't be loaded
 
-        st.subheader("🔍 Classification Result")
+
+# --- Prediction Function ---
+def predict_image(img, model, class_names, img_height=224, img_width=224):
+    # Preprocess the image
+    img = img.resize((img_width, img_height)) # Resize the image
+    img_array = image.img_to_array(img)
+    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
+    img_array /= 255.0  # Rescale the image
+
+    # Make prediction
+    predictions = model.predict(img_array)
+    predicted_class_index = np.argmax(predictions)
+    predicted_class_name = class_names[predicted_class_index]
+    confidence = predictions[0][predicted_class_index]
+
+    return predicted_class_name, confidence
+
+# --- Streamlit App Interface ---
+st.title("Tree Species Classification")
+
+st.write("Upload an image of a tree leaf to predict its species.")
+
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+
+if uploaded_file is not None:
+    # Display the uploaded image
+    img = image.load_img(uploaded_file)
+    st.image(img, caption="Uploaded Image", use_column_width=True)
+
+    # Make prediction
+    if model is not None and class_names is not None:
         with st.spinner("Predicting..."):
-            top_3 = predict_species(image, model, class_labels)
-            top_1 = top_3[0]
-            st.success(f"**Top Prediction:** {top_1[0]} ({top_1[1]*100:.2f}% confidence)")
-            st.write("Top 3 Predictions:")
-            for label, prob in top_3:
-                st.write(f"- {label}: {prob:.2%}")
+            predicted_species, confidence = predict_image(img, model, class_names)
 
-if __name__ == "__main__":
-    main()
+        st.write(f"**Predicted Species:** {predicted_species}")
+        st.write(f"**Confidence:** {confidence:.2f}")
+    else:
+        st.error("Model or class names not loaded. Cannot make prediction.")
+
+# --- Instructions for Running ---
+st.sidebar.header("How to run this app")
+st.sidebar.markdown("""
+1. Save the code above as a Python file (e.g., `app.py`).
+2. Make sure your trained model file (`improved_cnn_model.h5` or `basic_cnn_tree_species.h5`) is in the same directory as `app.py`.
+3. Open your terminal or command prompt.
+4. Navigate to the directory where you saved the files.
+5. Run the command: `streamlit run app.py`
+6. Your web browser should open with the Streamlit app.
+""")
