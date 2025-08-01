@@ -288,9 +288,17 @@ from tensorflow.keras.applications import EfficientNetB0
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, GlobalAveragePooling2D
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.applications import EfficientNetB0
 
-base_model = EfficientNetB0(include_top=False, input_shape=(IMG_HEIGHT, IMG_WIDTH, 3), weights='imagenet')
-base_model.trainable = False  # Freeze base model
+base_model = EfficientNetB0(
+    include_top=False,
+    input_shape=(IMG_HEIGHT, IMG_WIDTH, 3),
+    weights=None  # prevent auto-download
+)
+
+# Load local weights (adjust filename if different)
+base_model.load_weights("tree_species_model.h5")
+
 
 model = Sequential([
     base_model,
