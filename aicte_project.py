@@ -289,6 +289,9 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, GlobalAveragePooling2D
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.applications import EfficientNetB0
+from tensorflow.keras.models import load_model
+
+model = load_model("tree_species_model.h5")
 
 base_model = EfficientNetB0(
     include_top=False,
